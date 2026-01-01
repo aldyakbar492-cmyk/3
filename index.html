@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warta Santri | Portal Google Auth</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-storage-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #059669;
+            --dark: #0f172a;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+        }
+
+        /* --- FITUR DARK MODE --- */
+        body.dark-theme {
+            --bg: #020617;
+            --card-bg: #1e293b;
+            --text: #f1f5f9;
+            --dark: #f8fafc;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; transition: 0.3s; }
+
+        /* --- HALAMAN LOGIN --- */
+        #login-page {
+            position: fixed; inset: 0; background: #0f172a;
+            display: flex; /* Default tampil untuk mengunci */
+            justify-content: center; align-items: center; z-index: 10000;
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 24px;
+            width: 90%; max-width: 400px; text-align: center; color: #0f172a;
+        }
+        .btn-login {
+            background: var(--primary); color: white; border: none; padding: 12px 20px;
+            border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 20px; width: 100%;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: 70px; background: var(--card-bg); padding: 0 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .logo { font-weight: 800; font-size: 1.3rem; color: var(--primary); text-decoration: none; }
+        
+        /* SEARCH BAR */
+        .search-box {
+            background: var(--bg); border-radius: 12px; padding: 5px 15px;
+            display: flex; align-items: center; width: 30%; min-width: 150px;
+        }
+        .search-box input { border: none; background: none; padding: 5px; font-size: 0.85rem; color: var(--text); outline: none; width: 100%; }
+
+        .user-area { display: flex; align-items: center; gap: 10px; }
+        .user-img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary); }
+
+        /* --- LAYOUT UTAMA --- */
+        .wrapper { display: flex; height: calc(100vh - 70px); }
+
+        /* --- SIDEBAR --- */
+        aside {
+            width: 260px; background: var(--card-bg); border-right: 1px solid #e2e8f0;
+            padding: 25px; display: flex; flex-direction: column; gap: 8px;
+            transition: 0.3s;
+        }
+        .nav-item {
+            padding: 12px 15px; border-radius: 10px; cursor: pointer;
+            color: #64748b; font-weight: 600; transition: 0.2s; white-space: nowrap;
+        }
+        .nav-item:hover, .nav-item.active { background: #ecfdf5; color: var(--primary); }
+
+        /* --- CONTENT --- */
+        main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px; }
+        .container { max-width: 700px; margin: 0 auto; }
+
+        /* --- CARD ARTIKEL --- */
+        .card {
+            background: var(--card-bg); padding: 20px; border-radius: 20px;
+            margin-bottom: 20px; border: 1px solid #e2e8f0; position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            cursor: pointer; transition: 0.3s;
+        }
+
+        .article-content {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .article-image {
+            width: 100%; border-radius: 15px; margin-bottom: 12px; 
+            max-height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .actions { display: none; }
+
+        /* KELAS SAAT ARTIKEL DIBUKA */
+        .card.expanded { cursor: default; }
+        .card.expanded .article-content { display: block; -webkit-line-clamp: unset; }
+        .card.expanded .article-image { max-height: 500px; }
+        .card.expanded .actions { display: flex; }
+
+        .badge {
+            display: inline-block; padding: 4px 10px; border-radius: 6px;
+            font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 10px;
+        }
+        .badge-santri { background: #dcfce7; color: #166534; }
+        .badge-admin { background: #fee2e2; color: #991b1b; }
+
+        .btn-del {
+            position: absolute; top: 15px; right: 15px; background: #fff1f2;
+            color: #e11d48; border: none; width: 30px; height: 30px;
+            border-radius: 8px; cursor: pointer; font-size: 0.9rem; z-index: 10;
+        }
+
+        .actions {
+            gap: 15px; margin-top: 15px; padding-top: 15px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .btn-action {
+            background: none; border: none; color: #64748b; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 600;
+        }
+
+        /* --- MODAL & FAB --- */
+        .fab {
+            position: fixed; bottom: 90px; right: 20px; width: 55px; height: 55px;
+            background: var(--primary); color: white; border-radius: 50%; border: none;
+            font-size: 24px; cursor: pointer; box-shadow: 0 10px 15px rgba(5,150,105,0.4);
+            z-index: 99;
+        }
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: none; justify-content: center; align-items: center; z-index: 5000; padding: 15px;
+        }
+        .modal-box { background: var(--card-bg); padding: 25px; border-radius: 24px; width: 100%; max-width: 500px; color: var(--text); }
+        
+        input, select, textarea {
+            width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px;
+            border: 1px solid #e2e8f0; outline: none; font-size: 14px; background: var(--bg); color: var(--text);
+        }
+
+        #imgPreview { width: 100%; border-radius: 10px; display: none; margin-top: 10px; max-height: 150px; object-fit: cover; }
+
+        @media (max-width: 768px) {
+            .wrapper { flex-direction: column; }
+            aside {
+                position: fixed; bottom: 0; left: 0; right: 0; width: 100%;
+                height: 70px; flex-direction: row; padding: 5px 10px;
+                justify-content: space-around; border-right: none;
+                border-top: 1px solid #e2e8f0; z-index: 1000; gap: 2px;
+            }
+            aside p, aside hr, aside button[onclick="logout()"], .search-box { display: none; }
+            .nav-item { padding: 8px; font-size: 0.7rem; flex: 1; display: flex; flex-direction: column; align-items: center; border-radius: 8px; }
+            main { padding: 15px; }
+            .fab { bottom: 85px; right: 15px; width: 50px; height: 50px; }
+            header { height: 60px; }
+            .logo { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-page">
+        <div class="login-box">
+            <h2 style="color: var(--primary); margin-bottom: 10px;">Warta Santri</h2>
+            <p style="color: #64748b; font-size: 0.9rem;">Silakan masuk untuk melihat warta terbaru.</p>
+            <button class="btn-login" onclick="loginGoogle()">Masuk dengan Google</button>
+        </div>
+    </div>
+
+    <header>
+        <a href="#" class="logo">Warta<span>Santri</span></a>
+        
+        <div class="search-box">
+            🔍 <input type="text" id="searchInput" placeholder="Cari artikel..." onkeyup="loadFeed()">
+        </div>
+
+        <div class="user-area" id="user-header">
+            <button onclick="document.body.classList.toggle('dark-theme')" style="background:none; border:none; cursor:pointer; font-size:1.2rem;">🌓</button>
+            <span style="font-size:0.75rem; font-weight:700;">Tamu</span>
+            <div style="width:30px; height:30px; border-radius:50%; background:#ccc;"></div>
+        </div>
+    </header>
+
+    <div class="wrapper">
+        <aside>
+            <p style="font-size: 0.7rem; color: #94a3b8; font-weight: 800; margin-bottom: 5px; padding-left: 15px;">MENU</p>
+            <div class="nav-item active" id="nav-Semua" onclick="setFilter('Semua')">🏠 <span>Semua</span></div>
+            <div class="nav-item" id="nav-Santri" onclick="setFilter('Santri')">📖 <span>Santri</span></div>
+            <div class="nav-item" id="nav-Admin" onclick="setFilter('Admin')">🛡️ <span>Admin</span></div>
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid #f1f5f9;">
+            <button onclick="logout()" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-weight:600; text-align:left; padding-left:15px; font-size: 0.8rem;">Keluar</button>
+        </aside>
+
+        <main>
+            <div class="container" id="feedContainer"></div>
+        </main>
+    </div>
+
+    <button class="fab" onclick="openModal(true)">+</button>
+
+    <div class="modal" id="postModal">
+        <div class="modal-box">
+            <h3 style="margin-bottom:10px; font-size: 1.1rem;">Buat Artikel</h3>
+            <select id="catIn">
+                <option value="Santri">Artikel Santri</option>
+                <option value="Admin">Info Admin</option>
+            </select>
+            <input type="text" id="titIn" placeholder="Judul Artikel">
+            <textarea id="conIn" rows="5" placeholder="Tulis sesuatu..."></textarea>
+            
+            <label style="font-size:0.7rem; font-weight:700; display:block; margin-top:5px;">FOTO (OPSIONAL)</label>
+            <input type="file" id="imgIn" accept="image/*" onchange="previewFile()">
+            <img id="imgPreview" src="">
+
+            <button id="submitBtn" onclick="saveToFirebase()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; margin-top:10px;">Terbitkan</button>
+            <button onclick="openModal(false)" style="width:100%; background:none; border:none; color:#94a3b8; margin-top:10px; cursor:pointer; font-size: 0.9rem;">Batalkan</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfBJeaFAfMXmHGhWAcAKrADIfx3g10KUI",
+            authDomain: "web-aricle.firebaseapp.com",
+            databaseURL: "https://web-aricle-default-rtdb.firebaseio.com", 
+            projectId: "web-aricle",
+            storageBucket: "web-aricle.firebasestorage.app",
+            messagingSenderId: "89158729588",
+            appId: "1:89158729588:web:b27c5b2aeafa483220b621"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+        const storage = firebase.storage();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+        let userData = null;
+        let currentCategory = "Semua";
+
+        // LOGIKA LOGIN WAJIB
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                userData = user;
+                document.getElementById('login-page').style.display = 'none'; // Sembunyikan login
+                document.getElementById('user-header').innerHTML = `
+                    <button onclick="document.body.classList.toggle('dark-theme')" style="background:none; border:none; cursor:pointer; font-size:1.2rem; margin-right:10px;">🌓</button>
+                    <span style="font-size:0.75rem; font-weight:700;">${user.displayName.split(' ')[0]}</span>
+                    <img src="${user.photoURL}" class="user-img">
+                `;
+                loadFeed();
+            } else {
+                userData = null;
+                document.getElementById('login-page').style.display = 'flex'; // Tampilkan login (Kunci layar)
+                document.getElementById('feedContainer').innerHTML = ""; // Kosongkan feed
+            }
+        });
+
+        function loginGoogle() { auth.signInWithPopup(googleProvider); }
+        function logout() { auth.signOut().then(() => location.reload()); }
+        
+        function openModal(show) { 
+            document.getElementById('postModal').style.display = show ? 'flex' : 'none'; 
+            if(!show) resetForm();
+        }
+
+        function previewFile() {
+            const preview = document.getElementById('imgPreview');
+            const file = document.getElementById('imgIn').files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => { preview.src = reader.result; preview.style.display = 'block'; }
+            if (file) reader.readAsDataURL(file);
+        }
+
+        function resetForm() {
+            document.getElementById('titIn').value = "";
+            document.getElementById('conIn').value = "";
+            document.getElementById('imgIn').value = "";
+            document.getElementById('imgPreview').style.display = 'none';
+        }
+
+        function setFilter(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + cat).classList.add('active');
+            loadFeed();
+        }
+
+        async function saveToFirebase() {
+            const title = document.getElementById('titIn').value;
+            const content = document.getElementById('conIn').value;
+            const category = document.getElementById('catIn').value;
+            const file = document.getElementById('imgIn').files[0];
+            const btn = document.getElementById('submitBtn');
+
+            if (title && content) {
+                btn.innerText = "⏳ Sedang Mengunggah...";
+                btn.disabled = true;
+                let imageUrl = "";
+                try {
+                    if (file) {
+                        const storageRef = storage.ref('articles/' + Date.now() + "_" + file.name);
+                        const snapshot = await storageRef.put(file);
+                        imageUrl = await snapshot.ref.getDownloadURL();
+                    }
+                    await db.ref('articles').push({
+                        authorName: userData.displayName, authorUid: userData.uid,
+                        authorImg: userData.photoURL, category: category,
+                        title: title, content: content, articleImg: imageUrl,
+                        likes: 0, date: new Date().toLocaleDateString('id-ID'),
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    openModal(false);
+                } catch (error) { alert("Gagal: " + error.message); }
+                finally { btn.innerText = "Terbitkan"; btn.disabled = false; }
+            } else { alert("Isi judul & konten!"); }
+        }
+
+        function copyToClipboard(id) {
+            const link = window.location.origin + window.location.pathname + "#" + id;
+            navigator.clipboard.writeText(link).then(() => {
+                alert("Tautan artikel berhasil disalin!");
+            });
+        }
+
+        function toggleLike(id, currentLikes) {
+            db.ref('articles/' + id).update({ likes: (currentLikes || 0) + 1 });
+        }
+
+        function deleteArticle(id) {
+            if (confirm("Hapus artikel?")) db.ref('articles/' + id).remove();
+        }
+
+        function loadFeed() {
+            if(!userData) return;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            db.ref('articles').orderByChild('timestamp').on('value', snapshot => {
+                const container = document.getElementById('feedContainer');
+                container.innerHTML = "";
+                const data = snapshot.val();
+                if (data) {
+                    Object.entries(data).reverse().forEach(([id, art]) => {
+                        if (currentCategory !== "Semua" && art.category !== currentCategory) return;
+                        if (searchVal && !art.title.toLowerCase().includes(searchVal)) return;
+
+                        const isOwner = userData && userData.uid === art.authorUid;
+                        const isAdmin = userData && userData.email === "aldy.akbar492@gmail.com";
+                        const isPostByAdmin = art.category === "Admin";
+
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        if(isPostByAdmin) {
+                            card.style.border = "2px solid #ef4444";
+                            card.style.background = "rgba(239, 68, 68, 0.05)";
+                        }
+                        
+                        card.onclick = (e) => {
+                            if (!card.classList.contains('expanded')) {
+                                card.classList.add('expanded');
+                            }
+                        };
+
+                        card.innerHTML = `
+                            ${(isOwner || isAdmin) ? `<button class="btn-del" onclick="event.stopPropagation(); deleteArticle('${id}')">🗑️</button>` : ''}
+                            <span class="badge badge-${art.category.toLowerCase()}">
+                                ${isPostByAdmin ? '📢 PESAN ADMIN' : art.category}
+                            </span>
+                            <h2 style="margin-bottom:8px; line-height:1.3; font-size:1.1rem;">${art.title}</h2>
+                            ${art.articleImg ? `<img src="${art.articleImg}" class="article-image">` : ''}
+                            <p style="font-size:0.7rem; color:#94a3b8; margin-bottom:12px; display:flex; align-items:center; gap:5px;">
+                                <img src="${art.authorImg || ''}" style="width:16px; height:16px; border-radius:50%;">
+                                <b>${art.authorName}</b> ${isPostByAdmin ? '✅' : ''} • ${art.date}
+                            </p>
+                            <p class="article-content" style="white-space:pre-wrap; line-height:1.5; color:var(--text); font-size:0.9rem;">${art.content}</p>
+                            <div class="actions" onclick="event.stopPropagation()">
+                                <button class="btn-action" onclick="toggleLike('${id}', ${art.likes || 0})">❤️ ${art.likes || 0}</button>
+                                <button class="btn-action" onclick="copyToClipboard('${id}')">🔗 Share</button>
+                                <button class="btn-action" onclick="this.closest('.card').classList.remove('expanded')" style="color:#ef4444; margin-left:auto;">Tutup</button>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                } else {
+                    container.innerHTML = "<p style='text-align:center; color:#94a3b8; margin-top:50px;'>Belum ada data.</p>";
+                }
+            });
+        }
+    </script>
+</body>
+</html>
